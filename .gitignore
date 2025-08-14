@@ -38,3 +38,6 @@ Thumbs.db
 # --- IDE/Editor specific files ---
 .vscode/
 .idea/
+
+# Ignore Anaconda/Jupyter specific files
+**/anaconda_projects/
