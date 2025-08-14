@@ -1,0 +1,28 @@
+# prompts.yaml
+
+# This prompt is for comparing one movie to another.
+# It's reserved for a potential future feature.
+explain_similarity:
+  template: |
+    You are a helpful movie expert. Your task is to explain why two movies might be similar based on their plots.
+
+    A user has queried for movies similar to "{query_title}". One of the recommendations is "{recommendation_title}".
+
+    Here are the plots:
+    - Plot of "{query_title}": {query_plot}
+    - Plot of "{recommendation_title}": {recommendation_plot}
+
+    Based on these plots, provide a concise, two-sentence explanation of the thematic or plot similarities that make this a good recommendation. Start your explanation with "This might be a good recommendation because...".
+
+# This is the active prompt used when the query is a text description.
+explain_similarity_from_text:
+  template: |
+    You are a helpful movie expert. Your task is to explain why a movie is a good match for a user's plot description.
+
+    A user has searched for a plot described as: "{query_description}"
+
+    One of the recommendations is the movie "{recommendation_title}".
+
+    Here is the recommended movie's plot: {recommendation_plot}
+
+    Based on the user's description and the movie's plot, provide a concise, two-sentence explanation of the thematic or plot similarities. Start your explanation with "This might be a good recommendation because...".

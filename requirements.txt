@@ -1,0 +1,20 @@
+# requirements.txt
+
+# Core data and numerical libraries
+pandas
+numpy
+pyarrow
+
+# Vector search and embedding libraries
+chromadb
+sentence-transformers
+
+# LLM and API handling libraries
+google-generativeai
+python-dotenv
+requests
+PyYAML
+ollama
+
+# Frontend application library
+streamlit

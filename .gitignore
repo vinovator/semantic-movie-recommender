@@ -1,0 +1,40 @@
+# .gitignore
+
+# --- Data and Database Files ---
+# Ignore large data files. It's better to provide instructions
+# on how to get the data in your README.md.
+/data/raw/*
+/data/processed/*
+
+# Ignore the ChromaDB persistent storage directory
+/db/
+
+# --- Python Virtual Environment ---
+# Ignore the virtual environment folder
+/venv/
+venv/
+.venv/
+
+# --- Python Cache Files ---
+# Ignore compiled Python files and cache directories
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Jupyter Notebook Cache ---
+# Ignore the checkpoints directory created by Jupyter
+.ipynb_checkpoints/
+
+# --- Environment Variables / Secrets ---
+# CRITICAL: Never commit your environment variables file
+.env
+
+# --- OS-specific files ---
+# Ignore files created by macOS and Windows
+.DS_Store
+Thumbs.db
+
+# --- IDE/Editor specific files ---
+.vscode/
+.idea/
