@@ -124,3 +124,10 @@ Your browser should automatically open to the CineSearch application interface.
   * Improve the data pipeline with fuzzy matching on titles to increase the number of movies with plot data.
   * Add more advanced search features, such as searching for movies based on a reference movie title.
   * Implement user accounts and a "watchlist" feature.
+
+  ---
+  
+  ## 📜 License
+  This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
+  You may not use the material for commercial purposes. See the [LICENSE](LICENSE) file for details.
+  
