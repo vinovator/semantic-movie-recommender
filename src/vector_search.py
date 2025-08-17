@@ -1,44 +1,82 @@
 # src/vector_search.py
 
+import os
+import streamlit as st
 import chromadb
 import pandas as pd
+import numpy as np
 from sentence_transformers import SentenceTransformer
+from streamlit_chromadb_connection.chromadb_connection import ChromadbConnection
 from . import config
 from scipy.spatial.distance import cosine 
-import numpy as np 
 
 class SearchEngine:
     def __init__(self):
         """
-        Initializes the Search Engine by loading the embedding model,
-        the main data file, and connecting to the vector database.
+        Initializes the Search Engine with environment-aware ChromaDB client.
+        - On Streamlit Cloud: Builds an in-memory database.
+        - Locally: Uses a persistent on-disk database for speed.
         """
         print("Initializing Search Engine...")
         
-        # Load the sentence transformer model specified in config
         self.model = SentenceTransformer(config.EMBEDDING_MODEL)
-        
-        # Load the processed movie data from the Parquet file
         self.df = pd.read_parquet(config.PROCESSED_FILE)
         
-        # Initialize a persistent ChromaDB client
-        self.client = chromadb.PersistentClient(path=config.DB_DIR)
-        
-        # Get the collection for movie plots. This is the primary collection for search.
-        self.plot_collection = self.client.get_collection(name="movie_plots")
-
-        # The following collections are for advanced features like the "Plot Twist Finder".
-        # They are loaded here but used by separate methods that can be added later.
-        self.setup_collection = self.client.get_collection(name="plot_setups")
-        self.payoff_collection = self.client.get_collection(name="plot_payoffs")
+        # --- ENVIRONMENT-AWARE INITIALIZATION ---
+        # Check for an environment variable set by Streamlit Cloud
+        if "STREAMLIT_SERVER_RUNNING_ON_CLOUD" in os.environ:
+            print("Running in Streamlit Cloud environment. Initializing in-memory ChromaDB.")
+            # Use the Streamlit connection to get an in-memory client
+            self.client = st.connection('chromadb', type=ChromadbConnection).client
+            self._build_collections_in_memory()
+        else:
+            print("Running in local environment. Initializing persistent ChromaDB.")
+            # Use the faster persistent client for local development
+            self.client = chromadb.PersistentClient(path=config.DB_DIR)
+            self.plot_collection = self.client.get_collection(name="movie_plots")
+            self.setup_collection = self.client.get_collection(name="plot_setups")
+            self.payoff_collection = self.client.get_collection(name="plot_payoffs")
         
         print("Search Engine Initialized Successfully.")
 
+    def _build_collections_in_memory(self):
+        """A helper method to create and populate in-memory collections for the cloud environment."""
+        print("Building in-memory vector database... This may take a minute on first run.")
+        self.plot_collection = self.client.get_or_create_collection(name="movie_plots")
+        self.setup_collection = self.client.get_or_create_collection(name="plot_setups")
+        self.payoff_collection = self.client.get_or_create_collection(name="plot_payoffs")
 
+        # Check if collections are already populated to avoid rebuilding on every rerun
+        if self.plot_collection.count() > 0:
+            print("Collections already exist in memory.")
+            return
+
+        plots = self.df['plot'].tolist()
+        ids = self.df['tconst'].tolist()
+        setups = self.df['plot'].apply(lambda p: '. '.join(p.split('. ')[:int(len(p.split('. '))*0.3)]) + '.').tolist()
+        payoffs = self.df['plot'].apply(lambda p: '. '.join(p.split('. ')[int(len(p.split('. '))*0.3):]) + '.').tolist()
+
+        plot_embeddings = self.model.encode(plots, show_progress_bar=True)
+        setup_embeddings = self.model.encode(setups, show_progress_bar=True)
+        payoff_embeddings = self.model.encode(payoffs, show_progress_bar=True)
+        
+        metadata_df = self.df.drop(columns=['plot']).copy()
+        numeric_cols = metadata_df.select_dtypes(include=np.number).columns
+        metadata_df[numeric_cols] = metadata_df[numeric_cols].fillna(0)
+        metadata_df = metadata_df.fillna("")
+        metadata = metadata_df.to_dict('records')
+
+        batch_size = 4096
+        for i in range(0, len(ids), batch_size):
+            end_i = min(i + batch_size, len(ids))
+            self.plot_collection.add(ids=ids[i:end_i], embeddings=plot_embeddings[i:end_i].tolist(), metadatas=metadata[i:end_i])
+            self.setup_collection.add(ids=ids[i:end_i], embeddings=setup_embeddings[i:end_i].tolist(), metadatas=metadata[i:end_i])
+            self.payoff_collection.add(ids=ids[i:end_i], embeddings=payoff_embeddings[i:end_i].tolist(), metadatas=metadata[i:end_i])
+        print("In-memory database built successfully.")
+
+    # --- The search() and find_plot_twist() methods remain exactly the same ---
     def search(self, query_text=None, filters={}, k=config.TOP_K_RESULTS):
-        """
-        Performs a hybrid search using semantic text search and metadata filtering.
-        """
+        # ... (no changes needed here)
         if query_text:
             query_embedding = self.model.encode(query_text).tolist()
             results = self.plot_collection.query(query_embeddings=[query_embedding], n_results=100)
@@ -53,74 +91,45 @@ class SearchEngine:
             for key, value in filters.items():
                 if not value:
                     continue
-                
-                # --- SIMPLIFIED LOGIC ---
-                # Now that actors/directors are strings, we can use one method for all text filters.
                 if key == 'startYear':
                     search_df = search_df[search_df['startYear'].between(value[0], value[1])]
                 elif key == 'averageRating':
                     search_df = search_df[search_df['averageRating'] >= value]
-                else: # For string columns like 'genres', 'actors', and 'directors'
+                else:
                     search_df = search_df[search_df[key].str.contains(value, case=False, na=False)]
-                # --- END OF SIMPLIFICATION ---
 
         return search_df.sort_values(by='averageRating', ascending=False).head(k)
     
-    
     def find_plot_twist(self, tconst, k=5):
-        """
-        Finds movies that start similarly but have different endings.
-        """
-        # 1. Get and validate the reference setup vector
+        # ... (no changes needed here)
         setup_vectors = self.setup_collection.get(ids=[tconst], include=['embeddings'])
-        
-        # --- FINAL FIX: Simplify the check to only use the 'ids' list ---
-        # This avoids the ValueError by not evaluating the embeddings array directly.
         if not setup_vectors['ids']:
             print(f"Warning: Could not find setup vector for tconst {tconst}")
             return pd.DataFrame()
         reference_setup_vector = setup_vectors['embeddings'][0]
 
-        # 2. Get and validate the reference payoff vector
         payoff_vectors = self.payoff_collection.get(ids=[tconst], include=['embeddings'])
-        # --- FINAL FIX: Apply the same simplified check here ---
         if not payoff_vectors['ids']:
             print(f"Warning: Could not find payoff vector for tconst {tconst}")
             return pd.DataFrame()
         reference_payoff_vector = payoff_vectors['embeddings'][0]
 
-        # 3. Find movies with a similar setup
-        similar_setup_results = self.setup_collection.query(
-            query_embeddings=[reference_setup_vector],
-            n_results=50
-        )
-        
+        similar_setup_results = self.setup_collection.query(query_embeddings=[reference_setup_vector], n_results=50)
         candidate_ids = similar_setup_results['ids'][0]
-        
         if tconst in candidate_ids:
             candidate_ids.remove(tconst)
-        
         if not candidate_ids:
             return pd.DataFrame()
 
-        # 4. Calculate the payoff dissimilarity for each candidate
         candidate_payoff_vectors = self.payoff_collection.get(ids=candidate_ids, include=['embeddings'])['embeddings']
-        
         dissimilarities = []
         for candidate_vector in candidate_payoff_vectors:
             dist = cosine(reference_payoff_vector, candidate_vector)
             dissimilarities.append(dist)
 
-        # 5. Rank candidates and return
-        results_df = pd.DataFrame({
-            'tconst': candidate_ids,
-            'dissimilarity': dissimilarities
-        })
-        
+        results_df = pd.DataFrame({'tconst': candidate_ids, 'dissimilarity': dissimilarities})
         top_k_ids = results_df.sort_values(by='dissimilarity', ascending=False).head(k)
-        
         return self.df[self.df['tconst'].isin(top_k_ids['tconst'])]
-    
 
 # This block allows for direct testing of the module.
 # To run, execute `python -m src.vector_search` from the root directory.
