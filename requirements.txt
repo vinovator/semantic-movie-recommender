@@ -17,5 +17,5 @@ PyYAML
 ollama
 
 # Frontend application library
-streamlitstreamlit
+streamlit
 streamlit-chromadb-connection
