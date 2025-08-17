@@ -6,7 +6,7 @@ numpy
 pyarrow
 
 # Vector search and embedding libraries
-chromadb
+# chromadb # Commented for streamlit deployment
 sentence-transformers
 
 # LLM and API handling libraries
