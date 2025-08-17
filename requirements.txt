@@ -1,21 +1,21 @@
 # requirements.txt
 
 # Core data and numerical libraries
-pandas
-numpy
-pyarrow
+pandas==2.1.4
+numpy==1.26.4
+pyarrow==15.0.0
 
 # Vector search and embedding libraries
-# chromadb # Commented for streamlit deployment
-sentence-transformers
+sentence-transformers==2.7.0
 
 # LLM and API handling libraries
-google-generativeai
-python-dotenv
-requests
-PyYAML
-ollama
+google-generativeai==0.5.4
+python-dotenv==1.0.1
+requests==2.31.0
+PyYAML==6.0.1
+ollama==0.2.1
 
 # Frontend application library
-streamlit
-streamlit-chromadb-connection
+streamlit==1.33.0
+streamlit-chromadb-connection==1.0.5
+chromadb==0.5.3
